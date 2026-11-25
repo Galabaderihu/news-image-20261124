@@ -1,45 +1,54 @@
 #!/usr/bin/env python3
-"""Entry for make.fun bounty 'Sum up 24 November's world news in one image'
-(news-image-20261124).
+"""Publish the finished front page for the 24 November news-image bounty.
 
-Writes the prepared front-page image to /output/entry.png.
-The image is held in this repository as asset.png; this program copies its
-bytes exactly, uses no network, and produces identical bytes on every run.
-An ENTRY_OUTPUT environment variable may override the destination for
-local testing only.
+The artwork itself ships inside this repository as ``asset.png``: a
+single-page newspaper front page that sums up Tuesday 24 November 2026.
+This program is only the delivery step. It checks that the stored page
+really is a PNG, then places it at ``/output/entry.png`` exactly as
+stored, so the judged image is the page the repository holds, byte for
+byte, on every run. Nothing here touches the network and nothing is
+random: same repository in, same image out.
 """
+
 import os
-import shutil
-import stat
 import sys
 from pathlib import Path
 
+PAGE_FILE = "asset.png"
+DESTINATION = Path("/output/entry.png")
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
-def main() -> int:
-    here = Path(__file__).resolve().parent
-    asset = here / "asset.png"
-    if not asset.is_file():
-        print(f"missing asset: {asset}", file=sys.stderr)
+
+def read_page() -> bytes:
+    """Load the stored front page, refusing anything that is not a PNG."""
+    page_path = Path(__file__).resolve().parent / PAGE_FILE
+    if not page_path.exists():
+        raise FileNotFoundError(f"stored page is missing: {page_path}")
+    blob = page_path.read_bytes()
+    if not blob.startswith(PNG_SIGNATURE):
+        raise ValueError(f"{page_path} does not start with a PNG signature")
+    return blob
+
+
+def publish(blob: bytes, target: Path) -> Path:
+    """Write via a neighbouring temp file so the result is never partial."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    staging = target.with_name(target.name + ".part")
+    staging.write_bytes(blob)
+    os.replace(staging, target)
+    return target
+
+
+def run() -> int:
+    try:
+        blob = read_page()
+        written = publish(blob, DESTINATION)
+    except (OSError, ValueError) as problem:
+        print(f"could not publish the front page: {problem}", file=sys.stderr)
         return 1
-
-    dest = Path(os.environ.get("ENTRY_OUTPUT", "/output/entry.png"))
-    try:
-        dest.parent.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        dest = Path.cwd() / "output" / "entry.png"
-        dest.parent.mkdir(parents=True, exist_ok=True)
-
-    try:
-        os.umask(0o022)
-    except OSError:
-        pass
-    shutil.copyfile(asset, dest)
-    try:
-        os.chmod(dest, 0o644)
-    except OSError:
-        pass
+    print(f"front page published: {written} ({len(blob)} bytes)")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())

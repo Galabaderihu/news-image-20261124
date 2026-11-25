@@ -42,8 +42,12 @@ python3 main.py
 Writes `/output/entry.png` (1024×1024 PNG, under 1 MiB). The program uses
 only the Python standard library, no network, and copies `asset.png`
 byte-for-byte, so two runs always produce identical bytes.
-Set `ENTRY_OUTPUT=/some/path.png` to test locally with a different
-destination. `build_asset.py` draws `asset.png` with Pillow.
+Before writing anything, the program checks that the stored page
+begins with a real PNG signature, and it publishes through a temporary
+neighbouring file that is renamed into place, so a reader never sees a
+half-written page. The front page itself was typeset with Pillow while
+this entry was being produced; the finished page is what ships here,
+and no drawing step is needed when the entry runs.
 
 ## Licence
 
